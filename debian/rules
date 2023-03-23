@@ -1,4 +1,20 @@
 #!/usr/bin/make -f
 
+export PYBUILD_NAME=build
+
+# These tests explicitly invoke "pip install".
+export PYBUILD_TEST_ARGS = --ignore=tests/test_env.py \
+	-k 'not test_build_isolated and not test_build_raises_build_exception and not test_build_raises_build_backend_exception'
+
 %:
-	dh $@
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_build:
+	dh_auto_build
+	PYTHONPATH=$(CURDIR)/src/ http_proxy=127.0.0.1:9 \
+	https_proxy=127.0.0.1:9 python3 -m sphinx -N -bhtml \
+	docs/source/ build/html # HTML generator
+	PYTHONPATH=$(CURDIR)/src/ http_proxy=127.0.0.1:9 \
+	https_proxy=127.0.0.1:9 python3 -m sphinx -N -bman \
+	docs/source/ build/man # Manpage generator
+	mv build/man/build.1 build/man/pyproject-build.1
