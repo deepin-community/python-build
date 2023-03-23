@@ -1,0 +1,38 @@
+From: Sergio Durigan Junior <sergiodj@sergiodj.net>
+Date: Sun, 6 Dec 2020 00:32:46 -0500
+Subject: Don't require "furo" to build the docs
+
+We don't ship python3-furo on Debian.  We use the classic HTML theme
+on Sphinx instead.
+
+Author: Sergio Durigan Junior <sergiodj@debian.org>
+Forwarded: not-needed
+Last-Updated: 2020-12-06
+---
+ docs/requirements.txt | 2 +-
+ docs/source/conf.py   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/docs/requirements.txt b/docs/requirements.txt
+index 97f1309..d15059c 100644
+--- a/docs/requirements.txt
++++ b/docs/requirements.txt
+@@ -1,4 +1,4 @@
+ sphinx==3.*
+ sphinx-autodoc-typehints
+ sphinxcontrib.autoprogram
+-furo
++#furo
+diff --git a/docs/source/conf.py b/docs/source/conf.py
+index 0c0c607..c19949b 100644
+--- a/docs/source/conf.py
++++ b/docs/source/conf.py
+@@ -55,7 +55,7 @@ default_role = 'any'
+ # The theme to use for HTML and HTML Help pages.  See the documentation for
+ # a list of builtin themes.
+ #
+-html_theme = 'furo'
++html_theme = 'classic'
+ html_title = f'build {version}'
+ 
+ # Add any paths that contain custom static files (such as style sheets) here,
