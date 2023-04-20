@@ -1,2 +1,4 @@
+# Compulsory line, this is a version 4 file
 version=4
-https://pypi.debian.net/build/build-(.+)\.(?:zip|tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
+
+https://github.com/pypa/build/tags .*/archive/refs/tags/v?((?:\d+\.?)*)\.tar\.gz

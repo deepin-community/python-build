@@ -2,19 +2,18 @@
 
 export PYBUILD_NAME=build
 
-# These tests explicitly invoke "pip install".
-export PYBUILD_TEST_ARGS = --ignore=tests/test_env.py \
-	-k 'not test_build_isolated and not test_build_raises_build_exception and not test_build_raises_build_backend_exception'
-
 %:
-	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+	dh $@ --with python3 --buildsystem=pybuild
 
-override_dh_auto_build:
-	dh_auto_build
-	PYTHONPATH=$(CURDIR)/src/ http_proxy=127.0.0.1:9 \
-	https_proxy=127.0.0.1:9 python3 -m sphinx -N -bhtml \
-	docs/source/ build/html # HTML generator
-	PYTHONPATH=$(CURDIR)/src/ http_proxy=127.0.0.1:9 \
-	https_proxy=127.0.0.1:9 python3 -m sphinx -N -bman \
-	docs/source/ build/man # Manpage generator
-	mv build/man/build.1 build/man/pyproject-build.1
+# Unfortunately, python-build's testsuite relies heavily on "pip
+# install" and other network-related operations, which are not not
+# allowed during build time.
+#
+# Although not all tests are affected by this, it is becoming more and
+# more difficult to maintain a list of tests that should be disabled
+# because of this issue.  For this reason, and in order to keep the
+# maintenance burden low, we decided to disable running these tests
+# during build time.
+#
+# TODO: Create a dep8 test that runs the entire upstream testsuite.
+override_dh_auto_test:
