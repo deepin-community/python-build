@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+import importlib.util
 import os
 import os.path
 import platform
@@ -93,8 +94,8 @@ def get_project(name, tmp_path):
 )
 @pytest.mark.isolated
 def test_build(monkeypatch, project, args, call, tmp_path):
-    if project == 'flit' and '--no-isolation' in args:
-        pytest.xfail("can't build flit without isolation due to missing dependencies")
+    if project in {'build', 'flit'} and '--no-isolation' in args:
+        pytest.xfail(f"can't build {project} without isolation due to missing dependencies")
     if project == 'Solaar' and IS_WINDOWS and IS_PYPY3:
         pytest.xfail('Solaar fails building wheels via sdists on Windows on PyPy 3')
 
@@ -110,7 +111,7 @@ def test_build(monkeypatch, project, args, call, tmp_path):
             pytest.skip('Running via PYTHONPATH, so the pyproject-build entrypoint is not available')
     path = get_project(project, tmp_path)
     pkgs = tmp_path / 'pkgs'
-    args = [str(path), '-o', str(pkgs)] + args
+    args = [str(path), '-o', str(pkgs), *args]
 
     if call is None:
         build.__main__.main(args)
@@ -123,11 +124,7 @@ def test_build(monkeypatch, project, args, call, tmp_path):
 
 
 def test_isolation(tmp_dir, package_test_flit, mocker):
-    try:
-        import flit_core  # noqa: F401
-    except ModuleNotFoundError:
-        pass
-    else:
+    if importlib.util.find_spec('flit_core'):
         pytest.xfail('flit_core is available -- we want it missing!')  # pragma: no cover
 
     mocker.patch('build.__main__._error')

@@ -2,11 +2,24 @@
 
 export PYBUILD_NAME=build
 
+ifeq (,$(findstring nodoc, $(DEB_BUILD_OPTIONS)))
+export PYBUILD_AFTER_BUILD = \
+	PYTHONPATH={build_dir} \
+	http_proxy='127.0.0.1:9' \
+		{interpreter} -m sphinx -N -bhtml \
+		./docs/ ./docs/_build/html/ ; \
+	PYTHONPATH={build_dir} \
+	http_proxy='127.0.0.1:9' \
+		{interpreter} -m sphinx -N -bman \
+		./docs/ ./docs/_build/man/ ; \
+	mv -v ./docs/_build/man/build.1 ./docs/_build/man/pyproject-build.1
+endif
+
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
 # Unfortunately, python-build's testsuite relies heavily on "pip
-# install" and other network-related operations, which are not not
+# install" and other network-related operations, which are not
 # allowed during build time.
 #
 # Although not all tests are affected by this, it is becoming more and

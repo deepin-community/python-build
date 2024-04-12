@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+import contextlib
 import os
 import os.path
 import shutil
@@ -11,6 +12,12 @@ import tempfile
 import pytest
 
 import build.env
+
+
+if sys.version_info < (3, 8):
+    import importlib_metadata as metadata
+else:
+    from importlib import metadata
 
 
 def pytest_addoption(parser):
@@ -31,7 +38,8 @@ def pytest_collection_modifyitems(config, items):
     skip_other = pytest.mark.skip(reason='only integration tests are run (got --only-integration flag)')
 
     if config.getoption('--run-integration') and config.getoption('--only-integration'):  # pragma: no cover
-        raise pytest.UsageError("--run-integration and --only-integration can't be used together, choose one")
+        msg = "--run-integration and --only-integration can't be used together, choose one"
+        raise pytest.UsageError(msg)
 
     if len(items) == 1:  # do not require flags if called directly
         return
@@ -55,6 +63,11 @@ def pytest_collection_modifyitems(config, items):
 
 def is_integration(item):
     return os.path.basename(item.location[0]) == 'test_integration.py'
+
+
+@pytest.fixture()
+def local_pip(monkeypatch):
+    monkeypatch.setattr(build.env, '_valid_global_pip', lambda: None)
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -109,3 +122,25 @@ def tmp_dir():
 @pytest.fixture(autouse=True)
 def force_venv(mocker):
     mocker.patch.object(build.env, '_should_use_virtualenv', lambda: False)
+
+
+def pytest_report_header() -> str:
+    interesting_packages = [
+        'build',
+        'colorama',
+        'filelock',
+        'packaging',
+        'pip',
+        'pyproject_hooks',
+        'setuptools',
+        'tomli',
+        'virtualenv',
+        'wheel',
+    ]
+    valid = []
+    for package in interesting_packages:
+        # Old versions of importlib_metadata made this FileNotFoundError
+        with contextlib.suppress(ModuleNotFoundError, FileNotFoundError):
+            valid.append(f'{package}=={metadata.version(package)}')
+    reqs = ' '.join(valid)
+    return f'installed packages of interest: {reqs}'
