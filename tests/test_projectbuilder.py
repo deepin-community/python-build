@@ -2,24 +2,18 @@
 
 
 import copy
-import importlib
 import logging
 import os
+import pathlib
 import sys
 import textwrap
 
-import pep517.wrappers
+import pyproject_hooks
 import pytest
 
 import build
 
-
-if sys.version_info >= (3, 8):  # pragma: no cover
-    from importlib import metadata as importlib_metadata
-else:  # pragma: no cover
-    import importlib_metadata
-
-import pathlib
+from build._compat import importlib as _importlib
 
 
 build_open_owner = 'builtins'
@@ -27,11 +21,11 @@ build_open_owner = 'builtins'
 
 DEFAULT_BACKEND = {
     'build-backend': 'setuptools.build_meta:__legacy__',
-    'requires': ['setuptools >= 40.8.0', 'wheel'],
+    'requires': ['setuptools >= 40.8.0'],
 }
 
 
-class MockDistribution(importlib_metadata.Distribution):
+class MockDistribution(_importlib.metadata.Distribution):
     def locate_file(self, path):  # pragma: no cover
         return ''
 
@@ -49,7 +43,7 @@ class MockDistribution(importlib_metadata.Distribution):
             return CircularMockDistribution()
         elif name == 'nested_circular_dep':
             return NestedCircularMockDistribution()
-        raise importlib_metadata.PackageNotFoundError
+        raise _importlib.metadata.PackageNotFoundError
 
 
 class ExtraMockDistribution(MockDistribution):
@@ -60,13 +54,13 @@ class ExtraMockDistribution(MockDistribution):
                 Metadata-Version: 2.2
                 Name: extras_dep
                 Version: 1.0.0
-                Provides-Extra: extra_without_associated_deps
-                Provides-Extra: extra_with_unmet_deps
-                Requires-Dist: unmet_dep; extra == 'extra_with_unmet_deps'
-                Provides-Extra: extra_with_met_deps
-                Requires-Dist: extras_dep; extra == 'extra_with_met_deps'
-                Provides-Extra: recursive_extra_with_unmet_deps
-                Requires-Dist: recursive_dep; extra == 'recursive_extra_with_unmet_deps'
+                Provides-Extra: extra-without-associated-deps
+                Provides-Extra: extra-with_unmet-deps
+                Requires-Dist: unmet_dep; extra == 'extra-with-unmet-deps'
+                Provides-Extra: extra-with-met-deps
+                Requires-Dist: extras_dep; extra == 'extra-with-met-deps'
+                Provides-Extra: recursive-extra-with-unmet-deps
+                Requires-Dist: recursive_dep; extra == 'recursive-extra-with-unmet-deps'
                 """
             ).strip()
 
@@ -142,33 +136,33 @@ class NestedCircularMockDistribution(MockDistribution):
         ('requireless_dep', None),
         ('extras_dep[undefined_extra]', None),
         # would the wheel builder filter this out?
-        ('extras_dep[extra_without_associated_deps]', None),
+        ('extras_dep[extra-without-associated-deps]', None),
         (
-            'extras_dep[extra_with_unmet_deps]',
-            ('extras_dep[extra_with_unmet_deps]', 'unmet_dep; extra == "extra_with_unmet_deps"'),
+            'extras_dep[extra-with-unmet-deps]',
+            ('extras_dep[extra-with-unmet-deps]', 'unmet_dep; extra == "extra-with-unmet-deps"'),
         ),
         (
-            'extras_dep[recursive_extra_with_unmet_deps]',
+            'extras_dep[recursive-extra-with-unmet-deps]',
             (
-                'extras_dep[recursive_extra_with_unmet_deps]',
-                'recursive_dep; extra == "recursive_extra_with_unmet_deps"',
+                'extras_dep[recursive-extra-with-unmet-deps]',
+                'recursive_dep; extra == "recursive-extra-with-unmet-deps"',
                 'recursive_unmet_dep',
             ),
         ),
-        ('extras_dep[extra_with_met_deps]', None),
+        ('extras_dep[extra-with-met-deps]', None),
         ('missing_dep; python_version>"10"', None),
         ('missing_dep; python_version<="1"', None),
         ('missing_dep; python_version>="1"', ('missing_dep; python_version >= "1"',)),
         ('extras_dep == 1.0.0', None),
         ('extras_dep == 2.0.0', ('extras_dep==2.0.0',)),
-        ('extras_dep[extra_without_associated_deps] == 1.0.0', None),
-        ('extras_dep[extra_without_associated_deps] == 2.0.0', ('extras_dep[extra_without_associated_deps]==2.0.0',)),
+        ('extras_dep[extra-without-associated-deps] == 1.0.0', None),
+        ('extras_dep[extra-without-associated-deps] == 2.0.0', ('extras_dep[extra-without-associated-deps]==2.0.0',)),
         ('prerelease_dep >= 1.0.0', None),
         ('circular_dep', None),
     ],
 )
 def test_check_dependency(monkeypatch, requirement_string, expected):
-    monkeypatch.setattr(importlib_metadata, 'Distribution', MockDistribution)
+    monkeypatch.setattr(_importlib.metadata, 'Distribution', MockDistribution)
     assert next(build.check_dependency(requirement_string), None) == expected
 
 
@@ -185,25 +179,25 @@ def test_bad_project(package_test_no_project):
 
 
 def test_init(mocker, package_test_flit, package_legacy, test_no_permission, package_test_bad_syntax):
-    mocker.patch('pep517.wrappers.Pep517HookCaller')
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller')
 
     # correct flit pyproject.toml
     builder = build.ProjectBuilder(package_test_flit)
-    pep517.wrappers.Pep517HookCaller.assert_called_with(
+    pyproject_hooks.BuildBackendHookCaller.assert_called_with(
         package_test_flit, 'flit_core.buildapi', backend_path=None, python_executable=sys.executable, runner=builder._runner
     )
-    pep517.wrappers.Pep517HookCaller.reset_mock()
+    pyproject_hooks.BuildBackendHookCaller.reset_mock()
 
     # custom python
     builder = build.ProjectBuilder(package_test_flit, python_executable='some-python')
-    pep517.wrappers.Pep517HookCaller.assert_called_with(
+    pyproject_hooks.BuildBackendHookCaller.assert_called_with(
         package_test_flit, 'flit_core.buildapi', backend_path=None, python_executable='some-python', runner=builder._runner
     )
-    pep517.wrappers.Pep517HookCaller.reset_mock()
+    pyproject_hooks.BuildBackendHookCaller.reset_mock()
 
     # FileNotFoundError
     builder = build.ProjectBuilder(package_legacy)
-    pep517.wrappers.Pep517HookCaller.assert_called_with(
+    pyproject_hooks.BuildBackendHookCaller.assert_called_with(
         package_legacy,
         'setuptools.build_meta:__legacy__',
         backend_path=None,
@@ -221,13 +215,11 @@ def test_init(mocker, package_test_flit, package_legacy, test_no_permission, pac
         build.ProjectBuilder(package_test_bad_syntax)
 
 
-@pytest.mark.parametrize('value', [b'something', 'something_else'])
-def test_python_executable(package_test_flit, value):
-    builder = build.ProjectBuilder(package_test_flit)
-
-    builder.python_executable = value
-    assert builder.python_executable == value
-    assert builder._hook.python_executable == value
+def test_init_makes_source_dir_absolute(package_test_flit):
+    rel_dir = os.path.relpath(package_test_flit, os.getcwd())
+    assert not os.path.isabs(rel_dir)
+    builder = build.ProjectBuilder(rel_dir)
+    assert os.path.isabs(builder.source_dir)
 
 
 @pytest.mark.parametrize('distribution', ['wheel', 'sdist'])
@@ -256,15 +248,15 @@ def test_build_missing_backend(packages_path, distribution, tmpdir):
 
 
 def test_check_dependencies(mocker, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller.get_requires_for_build_sdist')
-    mocker.patch('pep517.wrappers.Pep517HookCaller.get_requires_for_build_wheel')
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller.get_requires_for_build_sdist')
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller.get_requires_for_build_wheel')
 
     builder = build.ProjectBuilder(package_test_flit)
 
     side_effects = [
         [],
         ['something'],
-        pep517.wrappers.BackendUnavailable,
+        pyproject_hooks.BackendUnavailable,
     ]
 
     builder._hook.get_requires_for_build_sdist.side_effect = copy.copy(side_effects)
@@ -285,23 +277,8 @@ def test_check_dependencies(mocker, package_test_flit):
         not builder.check_dependencies('wheel')
 
 
-def test_working_directory(tmp_dir):
-    assert os.path.realpath(os.curdir) != os.path.realpath(tmp_dir)
-    with build._working_directory(tmp_dir):
-        assert os.path.realpath(os.curdir) == os.path.realpath(tmp_dir)
-
-
-def test_working_directory_exc_is_not_transformed(mocker, package_test_flit, tmp_dir):
-    mocker.patch('build._working_directory', side_effect=OSError)
-
-    builder = build.ProjectBuilder(package_test_flit)
-    with pytest.raises(OSError):
-        builder._call_backend('build_sdist', tmp_dir)
-
-
 def test_build(mocker, package_test_flit, tmp_dir):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
-    mocker.patch('build._working_directory', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
 
@@ -310,23 +287,19 @@ def test_build(mocker, package_test_flit, tmp_dir):
 
     assert builder.build('sdist', tmp_dir) == os.path.join(tmp_dir, 'dist.tar.gz')
     builder._hook.build_sdist.assert_called_with(tmp_dir, None)
-    build._working_directory.assert_called_with(package_test_flit)
 
     assert builder.build('wheel', tmp_dir) == os.path.join(tmp_dir, 'dist.whl')
     builder._hook.build_wheel.assert_called_with(tmp_dir, None)
-    build._working_directory.assert_called_with(package_test_flit)
 
     with pytest.raises(build.BuildBackendException):
-        build._working_directory.assert_called_with(package_test_flit)
         builder.build('sdist', tmp_dir)
 
     with pytest.raises(build.BuildBackendException):
-        build._working_directory.assert_called_with(package_test_flit)
         builder.build('wheel', tmp_dir)
 
 
 def test_default_backend(mocker, package_legacy):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_legacy)
 
@@ -334,7 +307,7 @@ def test_default_backend(mocker, package_legacy):
 
 
 def test_missing_backend(mocker, package_test_no_backend):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_no_backend)
 
@@ -342,21 +315,21 @@ def test_missing_backend(mocker, package_test_no_backend):
 
 
 def test_missing_requires(mocker, package_test_no_requires):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     with pytest.raises(build.BuildException):
         build.ProjectBuilder(package_test_no_requires)
 
 
 def test_build_system_typo(mocker, package_test_typo):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     with pytest.warns(build.TypoWarning):
         build.ProjectBuilder(package_test_typo)
 
 
 def test_missing_outdir(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
     builder._hook.build_sdist.return_value = 'dist.tar.gz'
@@ -368,7 +341,7 @@ def test_missing_outdir(mocker, tmp_dir, package_test_flit):
 
 
 def test_relative_outdir(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
     builder._hook.build_sdist.return_value = 'dist.tar.gz'
@@ -379,13 +352,13 @@ def test_relative_outdir(mocker, tmp_dir, package_test_flit):
 
 
 def test_build_not_dir_outdir(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
     builder._hook.build_sdist.return_value = 'dist.tar.gz'
     out = os.path.join(tmp_dir, 'out')
 
-    open(out, 'a').close()  # create empty file
+    open(out, 'a', encoding='utf-8').close()  # create empty file
 
     with pytest.raises(build.BuildException):
         builder.build('sdist', out)
@@ -395,7 +368,7 @@ def test_build_not_dir_outdir(mocker, tmp_dir, package_test_flit):
 def demo_pkg_inline(tmp_path_factory):
     # builds a wheel without any dependencies and with a console script demo-pkg-inline
     tmp_path = tmp_path_factory.mktemp('demo-pkg-inline')
-    builder = build.ProjectBuilder(srcdir=os.path.join(os.path.dirname(__file__), 'packages', 'inline'))
+    builder = build.ProjectBuilder(source_dir=os.path.join(os.path.dirname(__file__), 'packages', 'inline'))
     out = tmp_path / 'dist'
     builder.build('wheel', str(out))
     return next(out.iterdir())
@@ -410,7 +383,7 @@ def test_build_with_dep_on_console_script(tmp_path, demo_pkg_inline, capfd, mock
     # to validate backend invocations contain the correct path we use an inline backend that will fail, but first
     # provides the PATH information (and validates shutil.which is able to discover the executable - as PEP states)
     toml = textwrap.dedent(
-        '''
+        """
         [build-system]
         requires = ["demo_pkg_inline"]
         build-backend = "build"
@@ -419,20 +392,20 @@ def test_build_with_dep_on_console_script(tmp_path, demo_pkg_inline, capfd, mock
         [project]
         description = "Factory ⸻ A code generator 🏭"
         authors = [{name = "Łukasz Langa"}]
-        '''
+        """
     )
     code = textwrap.dedent(
-        '''
+        """
         import os
         import shutil
         import sys
         print("BB " + os.environ["PATH"])
         exe_at = shutil.which("demo-pkg-inline")
         print("BB " + exe_at)
-        '''
+        """
     )
     (tmp_path / 'pyproject.toml').write_text(toml, encoding='UTF-8')
-    (tmp_path / 'build.py').write_text(code)
+    (tmp_path / 'build.py').write_text(code, encoding='utf-8')
 
     deps = {str(demo_pkg_inline)}  # we patch the requires demo_pkg_inline to refer to the wheel -> we don't need index
     mocker.patch('build.ProjectBuilder.build_system_requires', new_callable=mocker.PropertyMock, return_value=deps)
@@ -449,29 +422,27 @@ def test_build_with_dep_on_console_script(tmp_path, demo_pkg_inline, capfd, mock
 
 
 def test_prepare(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
-    mocker.patch('build._working_directory', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
     builder._hook.prepare_metadata_for_build_wheel.return_value = 'dist-1.0.dist-info'
 
     assert builder.prepare('wheel', tmp_dir) == os.path.join(tmp_dir, 'dist-1.0.dist-info')
     builder._hook.prepare_metadata_for_build_wheel.assert_called_with(tmp_dir, None, _allow_fallback=False)
-    build._working_directory.assert_called_with(package_test_flit)
 
 
 def test_prepare_no_hook(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
-    failure = pep517.wrappers.HookMissing('prepare_metadata_for_build_wheel')
+    failure = pyproject_hooks.HookMissing('prepare_metadata_for_build_wheel')
     builder._hook.prepare_metadata_for_build_wheel.side_effect = failure
 
     assert builder.prepare('wheel', tmp_dir) is None
 
 
 def test_prepare_error(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
     builder._hook.prepare_metadata_for_build_wheel.side_effect = Exception
@@ -481,19 +452,19 @@ def test_prepare_error(mocker, tmp_dir, package_test_flit):
 
 
 def test_prepare_not_dir_outdir(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
 
     builder = build.ProjectBuilder(package_test_flit)
 
     out = os.path.join(tmp_dir, 'out')
-    with open(out, 'w') as f:
+    with open(out, 'w', encoding='utf-8') as f:
         f.write('Not a directory')
     with pytest.raises(build.BuildException, match='Build path .* exists and is not a directory'):
         builder.prepare('wheel', out)
 
 
 def test_no_outdir_single(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller.prepare_metadata_for_build_wheel', return_value='')
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller.prepare_metadata_for_build_wheel', return_value='')
 
     builder = build.ProjectBuilder(package_test_flit)
 
@@ -504,7 +475,7 @@ def test_no_outdir_single(mocker, tmp_dir, package_test_flit):
 
 
 def test_no_outdir_multiple(mocker, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller.prepare_metadata_for_build_wheel', return_value='')
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller.prepare_metadata_for_build_wheel', return_value='')
 
     builder = build.ProjectBuilder(package_test_flit)
 
@@ -515,8 +486,9 @@ def test_no_outdir_multiple(mocker, tmp_dir, package_test_flit):
 
 
 def test_runner_user_specified(tmp_dir, package_test_flit):
-    def dummy_runner(cmd, cwd=None, env=None):
-        raise RuntimeError('Runner was called')
+    def dummy_runner(cmd, cwd=None, extra_environ=None):
+        msg = 'Runner was called'
+        raise RuntimeError(msg)
 
     builder = build.ProjectBuilder(package_test_flit, runner=dummy_runner)
     with pytest.raises(build.BuildBackendException, match='Runner was called'):
@@ -526,29 +498,31 @@ def test_runner_user_specified(tmp_dir, package_test_flit):
 def test_metadata_path_no_prepare(tmp_dir, package_test_no_prepare):
     builder = build.ProjectBuilder(package_test_no_prepare)
 
-    metadata = importlib_metadata.PathDistribution(
+    metadata = _importlib.metadata.PathDistribution(
         pathlib.Path(builder.metadata_path(tmp_dir)),
     ).metadata
 
-    assert metadata['name'] == 'test-no-prepare'
+    # Setuptools < v69.0.3 (https://github.com/pypa/setuptools/pull/4159) normalized this to dashes
+    assert metadata['name'].replace('-', '_') == 'test_no_prepare'
     assert metadata['Version'] == '1.0.0'
 
 
 def test_metadata_path_with_prepare(tmp_dir, package_test_setuptools):
     builder = build.ProjectBuilder(package_test_setuptools)
 
-    metadata = importlib_metadata.PathDistribution(
+    metadata = _importlib.metadata.PathDistribution(
         pathlib.Path(builder.metadata_path(tmp_dir)),
     ).metadata
 
-    assert metadata['name'] == 'test-setuptools'
+    # Setuptools < v69.0.3 (https://github.com/pypa/setuptools/pull/4159) normalized this to dashes
+    assert metadata['name'].replace('-', '_') == 'test_setuptools'
     assert metadata['Version'] == '1.0.0'
 
 
 def test_metadata_path_legacy(tmp_dir, package_legacy):
     builder = build.ProjectBuilder(package_legacy)
 
-    metadata = importlib_metadata.PathDistribution(
+    metadata = _importlib.metadata.PathDistribution(
         pathlib.Path(builder.metadata_path(tmp_dir)),
     ).metadata
 
@@ -563,33 +537,8 @@ def test_metadata_invalid_wheel(tmp_dir, package_test_bad_wheel):
         builder.metadata_path(tmp_dir)
 
 
-@pytest.fixture
-def mock_tomli_not_available(mocker):
-    loads = mocker.patch('tomli.loads')
-    mocker.patch.dict(sys.modules, {'tomli': None})
-    importlib.reload(build)
-    try:
-        yield
-    finally:
-        loads.assert_not_called()
-        mocker.stopall()
-        importlib.reload(build)
-
-
-@pytest.mark.skipif(sys.version_info >= (3, 11), reason='No need to test old toml support on 3.11+')
-def test_toml_instead_of_tomli(mocker, mock_tomli_not_available, tmp_dir, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
-
-    builder = build.ProjectBuilder(package_test_flit)
-    builder._hook.build_sdist.return_value = 'dist.tar.gz'
-
-    builder.build('sdist', '.')
-
-    builder._hook.build_sdist.assert_called_with(os.path.abspath('.'), None)
-
-
 def test_log(mocker, caplog, package_test_flit):
-    mocker.patch('pep517.wrappers.Pep517HookCaller', autospec=True)
+    mocker.patch('pyproject_hooks.BuildBackendHookCaller', autospec=True)
     mocker.patch('build.ProjectBuilder._call_backend', return_value='some_path')
     caplog.set_level(logging.DEBUG)
 
@@ -609,8 +558,6 @@ def test_log(mocker, caplog, package_test_flit):
         ('INFO', 'Building wheel...'),
         ('INFO', 'something'),
     ]
-    if sys.version_info >= (3, 8):  # stacklevel
-        assert caplog.records[-1].lineno == 602
 
 
 @pytest.mark.parametrize(

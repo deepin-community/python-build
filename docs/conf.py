@@ -35,6 +35,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx_autodoc_typehints',
     'sphinx_argparse_cli',
+    'sphinx_issues',
 ]
 
 intersphinx_mapping = {
@@ -65,3 +66,11 @@ html_title = f'build {version}'
 # html_static_path = ['_static']
 
 autoclass_content = 'both'
+
+nitpick_ignore = [
+    # https://github.com/python/importlib_metadata/issues/316
+    ('py:class', 'importlib.metadata._meta.PackageMetadata'),
+]
+
+
+issues_github_path = 'pypa/build'

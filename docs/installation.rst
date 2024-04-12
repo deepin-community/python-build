@@ -2,19 +2,17 @@
 Installation
 ============
 
-You can download a tarball_ from Github, checkout the latest `git tag`_ or fetch
-the artifacts from `project page`_ on PyPI.
-
-The recommended way is to checkout the git tags, as they are PGP signed with one
-of the following keys:
-
-- |3DCE51D60930EBA47858BA4146F633CBB0EB4BF2|_ *(Filipe Laíns)*
-
-``build`` may also be installed via `pip`_ or an equivalent:
+``build`` can be installed via `pip`_ or an equivalent:
 
 .. code-block:: sh
 
    $ pip install build
+
+You can also check out the latest `git tag`_, download a tarball_ from GitHub, or
+manually fetch the artifacts from the `project page`_ on PyPI. The git tags are
+recommended for redistribution and are PGP-signed with one of the following keys:
+
+- |3DCE51D60930EBA47858BA4146F633CBB0EB4BF2|_ *(Filipe Laíns)*
 
 .. tip::
    If you prefer, or are already using virtualenv_ in your workflow, you can
@@ -33,13 +31,9 @@ of the following keys:
 Bootstrapping
 =============
 
-This package can build itself with only the ``toml`` and ``pep517``
-dependencies. The ``--skip-dependency-check`` flag should be used in this
-case.
-
-On Python 3.10 and older, we have a dependency on tomli_, but toml_ can be
-used instead, which may make bootstrapping easier.
-
+This package can build itself only with the ``tomli`` (can be omitted in Python 3.11+)
+and ``pyproject-hooks`` dependencies.
+The ``--skip-dependency-check`` flag should be used in this case.
 
 Compatibility
 =============
@@ -47,13 +41,11 @@ Compatibility
 ``build`` is verified to be compatible with the following Python
 versions:
 
-- 2.7
-- 3.5
-- 3.6
 - 3.7
 - 3.8
 - 3.9
-- PyPy(2)
+- 3.10
+- 3.11
 - PyPy3
 
 
@@ -70,7 +62,6 @@ versions:
 .. _project page: https://pypi.org/project/build/
 
 .. _tomli: https://github.com/hukkin/tomli
-.. _toml: https://github.com/uiri/toml
 
 
 .. |3DCE51D60930EBA47858BA4146F633CBB0EB4BF2| replace:: ``3DCE51D60930EBA47858BA4146F633CBB0EB4BF2``

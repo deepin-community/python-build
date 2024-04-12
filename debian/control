@@ -5,11 +5,18 @@ Maintainer: Debian Python Team <team+python@tracker.debian.org>
 Uploaders: Sergio Durigan Junior <sergiodj@debian.org>
 Build-Depends: debhelper-compat (= 13),
 	       dh-python,
-	       python3-setuptools,
+	       flit (>= 3.4),
 	       python3-all,
 	       python3-packaging,
-	       python3-pep517 (>= 0.9),
+	       python3-pyproject-hooks,
+	       pybuild-plugin-pyproject,
 	       python3-toml,
+	       dh-sequence-sphinxdoc <!nodoc>,
+	       python3-sphinx <!nodoc>,
+	       python3-sphinx-autodoc-typehints <!nodoc>,
+	       python3-sphinx-argparse-cli <!nodoc>,
+	       python3-sphinx-issues <!nodoc>,
+	       furo <!nodoc>,
 Standards-Version: 4.6.2
 Homepage: https://github.com/pypa/build
 Vcs-Browser: https://salsa.debian.org/python-team/packages/python-build
@@ -22,14 +29,27 @@ Architecture: all
 Depends: ${python3:Depends},
 	 ${misc:Depends},
 	 python3-packaging,
-	 python3-pep517 (>= 0.9),
+	 python3-pyproject-hooks,
 	 python3-toml,
 	 python3-wheel,
 Suggests: python3-pip,
 	  python3-venv,
+	  python-build-doc,
 Description: Simple, correct PEP517 package builder (Python 3)
  python-build will invoke the PEP 517 hooks to build a distribution
  package. It is a simple build tool and does not perform any
  dependency management.
  .
  This package installs the library for Python 3.
+
+Package: python3-build-doc
+Architecture: all
+Section: doc
+Depends: ${sphinxdoc:Depends}, ${misc:Depends}
+Multi-Arch: foreign
+Description: Simple, correct PEP517 package builder (documentation)
+ python-build will invoke the PEP 517 hooks to build a distribution
+ package. It is a simple build tool and does not perform any
+ dependency management.
+ .
+ This is the documentation package.
