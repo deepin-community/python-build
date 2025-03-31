@@ -17,7 +17,7 @@ Build-Depends: debhelper-compat (= 13),
 	       python3-sphinx-argparse-cli <!nodoc>,
 	       python3-sphinx-issues <!nodoc>,
 	       furo <!nodoc>,
-Standards-Version: 4.6.2
+Standards-Version: 4.7.0
 Homepage: https://github.com/pypa/build
 Vcs-Browser: https://salsa.debian.org/python-team/packages/python-build
 Vcs-Git: https://salsa.debian.org/python-team/packages/python-build.git

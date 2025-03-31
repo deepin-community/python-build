@@ -12,6 +12,7 @@ import pyproject_hooks
 import pytest
 
 import build
+import build._builder
 
 from build._compat import importlib as _importlib
 
@@ -374,6 +375,7 @@ def demo_pkg_inline(tmp_path_factory):
     return next(out.iterdir())
 
 
+@pytest.mark.contextvars
 @pytest.mark.isolated
 def test_build_with_dep_on_console_script(tmp_path, demo_pkg_inline, capfd, mocker):
     """
@@ -548,7 +550,6 @@ def test_log(mocker, caplog, package_test_flit):
     builder.prepare('wheel', '.')
     builder.build('sdist', '.')
     builder.build('wheel', '.')
-    builder.log('something')
 
     assert [(record.levelname, record.message) for record in caplog.records] == [
         ('INFO', 'Getting build dependencies for sdist...'),
@@ -556,7 +557,6 @@ def test_log(mocker, caplog, package_test_flit):
         ('INFO', 'Getting metadata for wheel...'),
         ('INFO', 'Building sdist...'),
         ('INFO', 'Building wheel...'),
-        ('INFO', 'something'),
     ]
 
 
@@ -578,7 +578,7 @@ def test_log(mocker, caplog, package_test_flit):
     ],
 )
 def test_parse_valid_build_system_table_type(pyproject_toml, parse_output):
-    assert build._parse_build_system_table(pyproject_toml) == parse_output
+    assert build._builder._parse_build_system_table(pyproject_toml) == parse_output
 
 
 @pytest.mark.parametrize(
@@ -616,4 +616,4 @@ def test_parse_valid_build_system_table_type(pyproject_toml, parse_output):
 )
 def test_parse_invalid_build_system_table_type(pyproject_toml, error_message):
     with pytest.raises(build.BuildSystemTableValidationError, match=error_message):
-        build._parse_build_system_table(pyproject_toml)
+        build._builder._parse_build_system_table(pyproject_toml)
