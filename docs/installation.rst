@@ -9,10 +9,17 @@ Installation
    $ pip install build
 
 You can also check out the latest `git tag`_, download a tarball_ from GitHub, or
-manually fetch the artifacts from the `project page`_ on PyPI. The git tags are
-recommended for redistribution and are PGP-signed with one of the following keys:
+manually fetch the artifacts from the `project page`_ on PyPI. `Attestations
+<https://github.com/pypa/build/attestations>`_ are available after 1.2.1 and
+can be verified with the ``gh`` CLI tool:
 
-- |3DCE51D60930EBA47858BA4146F633CBB0EB4BF2|_ *(Filipe Laíns)*
+.. code-block:: sh
+
+   $ python -m pip --no-cache-dir download --no-deps build
+   $ gh attestation verify build*.whl --repo pypa/build
+
+Build plans to support `PEP 740 <https://peps.python.org/pep-0740>`_ if
+accepted.
 
 .. tip::
    If you prefer, or are already using virtualenv_ in your workflow, you can
@@ -28,6 +35,9 @@ recommended for redistribution and are PGP-signed with one of the following keys
    Python package does not include venv_ in the standard installation (such as
    some versions of Ubuntu).
 
+   There is also a ``uv`` extra, which can be used for ``--installer=uv`` if
+   you don't have another install of ``uv`` available.
+
 Bootstrapping
 =============
 
@@ -41,11 +51,11 @@ Compatibility
 ``build`` is verified to be compatible with the following Python
 versions:
 
-- 3.7
 - 3.8
 - 3.9
 - 3.10
 - 3.11
+- 3.12
 - PyPy3
 
 

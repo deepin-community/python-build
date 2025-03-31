@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 
 import contextlib
+import contextvars
+import importlib.metadata
 import os
 import os.path
 import shutil
@@ -9,15 +11,11 @@ import sys
 import sysconfig
 import tempfile
 
+from functools import partial, update_wrapper
+
 import pytest
 
 import build.env
-
-
-if sys.version_info < (3, 8):
-    import importlib_metadata as metadata
-else:
-    from importlib import metadata
 
 
 def pytest_addoption(parser):
@@ -65,9 +63,25 @@ def is_integration(item):
     return os.path.basename(item.location[0]) == 'test_integration.py'
 
 
-@pytest.fixture()
+def pytest_runtest_call(item: pytest.Item):
+    if item.get_closest_marker('contextvars'):
+        if isinstance(item, pytest.Function):
+            wrapped_function = partial(contextvars.copy_context().run, item.obj)
+            item.obj = update_wrapper(wrapped_function, item.obj)
+        else:
+            msg = 'cannot rewrap non-function item'
+            raise RuntimeError(msg)
+
+
+@pytest.fixture
 def local_pip(monkeypatch):
-    monkeypatch.setattr(build.env, '_valid_global_pip', lambda: None)
+    monkeypatch.setattr(build.env._PipBackend, '_has_valid_outer_pip', None)
+
+
+@pytest.fixture(autouse=True, params=[False])
+def has_virtualenv(request, monkeypatch):
+    if request.param is not None:
+        monkeypatch.setattr(build.env._PipBackend, '_has_virtualenv', request.param)
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -119,11 +133,6 @@ def tmp_dir():
     shutil.rmtree(path)
 
 
-@pytest.fixture(autouse=True)
-def force_venv(mocker):
-    mocker.patch.object(build.env, '_should_use_virtualenv', lambda: False)
-
-
 def pytest_report_header() -> str:
     interesting_packages = [
         'build',
@@ -141,6 +150,6 @@ def pytest_report_header() -> str:
     for package in interesting_packages:
         # Old versions of importlib_metadata made this FileNotFoundError
         with contextlib.suppress(ModuleNotFoundError, FileNotFoundError):
-            valid.append(f'{package}=={metadata.version(package)}')
+            valid.append(f'{package}=={importlib.metadata.version(package)}')
     reqs = ' '.join(valid)
     return f'installed packages of interest: {reqs}'

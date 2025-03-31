@@ -4,10 +4,9 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "build"
-version = "1.1.1"
 description = "A simple, correct Python build frontend"
 readme = "README.md"
-requires-python = ">= 3.7"
+requires-python = ">= 3.8"
 license.file = "LICENSE"
 authors = [
   { name = "Filipe Laíns", email = "lains@riseup.net" },
@@ -19,7 +18,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
@@ -32,9 +30,10 @@ urls.changelog = "https://build.pypa.io/en/stable/changelog.html"
 urls.homepage = "https://build.pypa.io"
 urls.issues = "https://github.com/pypa/build/issues"
 urls.source = "https://github.com/pypa/build"
-
+# Version read from __version__ field in __init__.py by Flit
+dynamic = ["version"]
 dependencies = [
-  "packaging >= 19.0",
+  "packaging >= 19.1",
   "pyproject_hooks",
   # not actually a runtime dependency, only supplied as there is not "recommended dependency" support
   'colorama; os_name == "nt"',
@@ -51,6 +50,7 @@ docs = [
   "sphinx-issues >= 3.0.0",
 ]
 test = [
+  "build[uv, virtualenv]",
   "filelock >= 3",
   "pytest >= 6.2.4",
   "pytest-cov >= 2.12",
@@ -64,10 +64,14 @@ test = [
   'setuptools >= 67.8.0; python_version >= "3.12"',
 ]
 typing = [
+  "build[uv]",
   "importlib-metadata >= 5.1",
-  "mypy ~= 1.5.0",
+  "mypy ~= 1.9.0",
   "tomli",
   "typing-extensions >= 3.7.4.3",
+]
+uv = [
+  "uv >= 0.1.18",
 ]
 virtualenv = [
   "virtualenv >= 20.0.35",
@@ -115,6 +119,7 @@ xfail_strict = true
 junit_family = "xunit2"
 norecursedirs = "tests/integration/*"
 markers = [
+  "contextvars",
   "isolated",
   "pypy3323bug",
   "network",
@@ -128,7 +133,7 @@ filterwarnings = [
 
 [tool.mypy]
 files = "src"
-python_version = "3.7"
+python_version = "3.8"
 strict = true
 show_error_codes = true
 enable_error_code = ["ignore-without-code", "truthy-bool", "redundant-expr"]
@@ -136,14 +141,15 @@ enable_error_code = ["ignore-without-code", "truthy-bool", "redundant-expr"]
 [[tool.mypy.overrides]]
 module = [
   "colorama",   # Optional dependency
-  "pyproject_hooks.*",   # Untyped
   "virtualenv", # Optional dependency
 ]
 ignore_missing_imports = true
 
 [tool.ruff]
-src = ["src"]
-exclude = ["tests/packages/test-bad-syntax"]
+exclude = [
+  "tests/packages/*/pyproject.toml",
+  "tests/packages/test-bad-syntax",
+]
 line-length = 127
 
 [tool.ruff.format]

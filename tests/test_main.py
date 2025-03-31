@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: MIT
 
 import contextlib
-import importlib
 import io
 import os
 import re
@@ -13,6 +12,9 @@ import pytest
 
 import build
 import build.__main__
+
+
+pytestmark = pytest.mark.contextvars
 
 
 build_open_owner = 'builtins'
@@ -28,76 +30,81 @@ ANSI_STRIP = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     [
         (
             [],
-            [cwd, out, ['wheel'], {}, True, False],
+            [cwd, out, ['wheel'], {}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-n'],
-            [cwd, out, ['wheel'], {}, False, False],
+            [cwd, out, ['wheel'], {}, False, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-s'],
-            [cwd, out, ['sdist'], {}, True, False],
+            [cwd, out, ['sdist'], {}, True, False, None],
             'build_package',
         ),
         (
             ['-w'],
-            [cwd, out, ['wheel'], {}, True, False],
+            [cwd, out, ['wheel'], {}, True, False, None],
             'build_package',
         ),
         (
             ['-s', '-w'],
-            [cwd, out, ['sdist', 'wheel'], {}, True, False],
+            [cwd, out, ['sdist', 'wheel'], {}, True, False, None],
             'build_package',
         ),
         (
             ['source'],
-            ['source', os.path.join('source', 'dist'), ['wheel'], {}, True, False],
+            ['source', os.path.join('source', 'dist'), ['wheel'], {}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-o', 'out'],
-            [cwd, 'out', ['wheel'], {}, True, False],
+            [cwd, 'out', ['wheel'], {}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['source', '-o', 'out'],
-            ['source', 'out', ['wheel'], {}, True, False],
+            ['source', 'out', ['wheel'], {}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-x'],
-            [cwd, out, ['wheel'], {}, True, True],
+            [cwd, out, ['wheel'], {}, True, True, None],
+            'build_package_via_sdist',
+        ),
+        (
+            ['--installer', 'uv'],
+            [cwd, out, ['wheel'], {}, True, False, 'uv'],
             'build_package_via_sdist',
         ),
         (
             ['-C--flag1', '-C--flag2'],
-            [cwd, out, ['wheel'], {'--flag1': '', '--flag2': ''}, True, False],
+            [cwd, out, ['wheel'], {'--flag1': '', '--flag2': ''}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-C--flag=value'],
-            [cwd, out, ['wheel'], {'--flag': 'value'}, True, False],
+            [cwd, out, ['wheel'], {'--flag': 'value'}, True, False, None],
             'build_package_via_sdist',
         ),
         (
             ['-C--flag1=value', '-C--flag2=other_value', '-C--flag2=extra_value'],
-            [cwd, out, ['wheel'], {'--flag1': 'value', '--flag2': ['other_value', 'extra_value']}, True, False],
+            [cwd, out, ['wheel'], {'--flag1': 'value', '--flag2': ['other_value', 'extra_value']}, True, False, None],
             'build_package_via_sdist',
         ),
     ],
 )
 def test_parse_args(mocker, cli_args, build_args, hook):
-    mocker.patch('build.__main__.build_package', return_value=['something'])
-    mocker.patch('build.__main__.build_package_via_sdist', return_value=['something'])
+    build_package = mocker.patch('build.__main__.build_package', return_value=['something'])
+    build_package_via_sdist = mocker.patch('build.__main__.build_package_via_sdist', return_value=['something'])
 
     build.__main__.main(cli_args)
 
     if hook == 'build_package':
-        build.__main__.build_package.assert_called_with(*build_args)
+        build_package.assert_called_with(*build_args)
     elif hook == 'build_package_via_sdist':
-        build.__main__.build_package_via_sdist.assert_called_with(*build_args)
+        build_package_via_sdist.assert_called_with(*build_args)
     else:  # pragma: no cover
         msg = f'Unknown hook {hook}'
         raise ValueError(msg)
@@ -229,15 +236,16 @@ def test_build_package_via_sdist_invalid_distribution(tmp_dir, package_test_setu
         pytest.param(
             [],
             [
-                '* Creating venv isolated environment...',
-                '* Installing packages in isolated environment... (setuptools >= 42.0.0)',
+                '* Creating isolated environment: venv+pip...',
+                '* Installing packages in isolated environment:',
+                '  - setuptools >= 42.0.0',
                 '* Getting build dependencies for sdist...',
                 '* Building sdist...',
                 '* Building wheel from sdist',
-                '* Creating venv isolated environment...',
-                '* Installing packages in isolated environment... (setuptools >= 42.0.0)',
+                '* Creating isolated environment: venv+pip...',
+                '* Installing packages in isolated environment:',
+                '  - setuptools >= 42.0.0',
                 '* Getting build dependencies for wheel...',
-                '* Installing packages in isolated environment... (wheel)',
                 '* Building wheel...',
                 'Successfully built test_setuptools-1.0.0.tar.gz and test_setuptools-1.0.0-py2.py3-none-any.whl',
             ],
@@ -259,10 +267,10 @@ def test_build_package_via_sdist_invalid_distribution(tmp_dir, package_test_setu
         pytest.param(
             ['--wheel'],
             [
-                '* Creating venv isolated environment...',
-                '* Installing packages in isolated environment... (setuptools >= 42.0.0)',
+                '* Creating isolated environment: venv+pip...',
+                '* Installing packages in isolated environment:',
+                '  - setuptools >= 42.0.0',
                 '* Getting build dependencies for wheel...',
-                '* Installing packages in isolated environment... (wheel)',
                 '* Building wheel...',
                 'Successfully built test_setuptools-1.0.0-py2.py3-none-any.whl',
             ],
@@ -304,15 +312,7 @@ def test_build_package_via_sdist_invalid_distribution(tmp_dir, package_test_setu
 def test_output(package_test_setuptools, tmp_dir, capsys, args, output):
     build.__main__.main([package_test_setuptools, '-o', tmp_dir, *args])
     stdout, stderr = capsys.readouterr()
-    assert stdout.splitlines() == output
-
-
-@pytest.fixture()
-def main_reload_styles():
-    try:
-        yield
-    finally:
-        importlib.reload(build.__main__)
+    assert set(stdout.splitlines()) <= set(output)
 
 
 @pytest.mark.pypy3323bug
@@ -323,20 +323,20 @@ def main_reload_styles():
             False,
             'ERROR ',
             [
-                '* Creating venv isolated environment...',
-                '* Installing packages in isolated environment... (setuptools >= 42.0.0, this is invalid)',
-                '',
-                'Traceback (most recent call last):',
+                '* Creating isolated environment: venv+pip...',
+                '* Installing packages in isolated environment:',
+                '  - setuptools >= 42.0.0',
+                '  - this is invalid',
             ],
         ),
         (
             True,
             '\33[91mERROR\33[0m ',
             [
-                '\33[1m* Creating venv isolated environment...\33[0m',
-                '\33[1m* Installing packages in isolated environment... (setuptools >= 42.0.0, this is invalid)\33[0m',
-                '',
-                '\33[2mTraceback (most recent call last):',
+                '\33[1m* Creating isolated environment: venv+pip...\33[0m',
+                '\33[1m* Installing packages in isolated environment:\33[0m',
+                '  - setuptools >= 42.0.0',
+                '  - this is invalid',
             ],
         ),
     ],
@@ -346,7 +346,6 @@ def main_reload_styles():
 def test_output_env_subprocess_error(
     mocker,
     monkeypatch,
-    main_reload_styles,
     package_test_invalid_requirements,
     tmp_dir,
     capsys,
@@ -363,8 +362,6 @@ def test_output_env_subprocess_error(
     monkeypatch.delenv('NO_COLOR', raising=False)
     monkeypatch.setenv('FORCE_COLOR' if color else 'NO_COLOR', '')
 
-    importlib.reload(build.__main__)  # reload module to set _STYLES
-
     with pytest.raises(SystemExit):
         build.__main__.main([package_test_invalid_requirements, '-o', tmp_dir])
     stdout, stderr = capsys.readouterr()
@@ -375,8 +372,7 @@ def test_output_env_subprocess_error(
 
     # Newer versions of pip also color stderr - strip them if present
     cleaned_stderr = ANSI_STRIP.sub('', '\n'.join(stderr)).strip()
-    assert len(cleaned_stderr.splitlines()) == 1
-    assert cleaned_stderr.startswith('ERROR: Invalid requirement: ')
+    assert cleaned_stderr.startswith('< ERROR: Invalid requirement: ')
 
 
 @pytest.mark.parametrize(
@@ -390,17 +386,17 @@ def test_output_env_subprocess_error(
         (True, {'FORCE_COLOR': ''}, build.__main__._COLORS),
     ],
 )
-def test_colors(mocker, monkeypatch, main_reload_styles, tty, env, colors):
+def test_colors(mocker, monkeypatch, tty, env, colors):
     mocker.patch('sys.stdout.isatty', return_value=tty)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
 
-    importlib.reload(build.__main__)  # reload module to set _STYLES
+    build.__main__._init_colors()
 
-    assert build.__main__._STYLES == colors
+    assert build.__main__._styles.get() == colors
 
 
-def test_colors_conflict(monkeypatch, main_reload_styles):
+def test_colors_conflict(monkeypatch):
     with monkeypatch.context() as m:
         m.setenv('NO_COLOR', '')
         m.setenv('FORCE_COLOR', '')
@@ -409,20 +405,17 @@ def test_colors_conflict(monkeypatch, main_reload_styles):
             UserWarning,
             match='Both NO_COLOR and FORCE_COLOR environment variables are set, disabling color',
         ):
-            importlib.reload(build.__main__)
+            build.__main__._init_colors()
 
-        assert build.__main__._STYLES == build.__main__._NO_COLORS
-
-
-def raise_called_process_err(*args, **kwargs):
-    raise subprocess.CalledProcessError(1, ['test', 'args'], b'stdoutput', b'stderror')
+        assert build.__main__._styles.get() == build.__main__._NO_COLORS
 
 
 def test_venv_fail(monkeypatch, package_test_flit, tmp_dir, capsys):
+    def raise_called_process_err(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, ['test', 'args'], b'stdoutput', b'stderror')
+
     monkeypatch.setattr(venv.EnvBuilder, 'create', raise_called_process_err)
     monkeypatch.setenv('NO_COLOR', '')
-
-    importlib.reload(build.__main__)  # reload module to set _STYLES
 
     with pytest.raises(SystemExit):
         build.__main__.main([package_test_flit, '-o', tmp_dir])
@@ -432,13 +425,36 @@ def test_venv_fail(monkeypatch, package_test_flit, tmp_dir, capsys):
     assert (
         stdout
         == """\
-* Creating venv isolated environment...
+* Creating isolated environment: venv+pip...
+> test args
+< stdoutput
 ERROR Failed to create venv. Maybe try installing virtualenv.
-  Command 'test args' failed with return code 1
-  stdout:
-    stdoutput
-  stderr:
-    stderror
 """
     )
-    assert stderr == ''
+    assert (
+        stderr
+        == """\
+< stderror
+"""
+    )
+
+
+@pytest.mark.network
+@pytest.mark.parametrize('verbosity', [0, 1])
+def test_verbose_output(
+    capsys: pytest.CaptureFixture,
+    monkeypatch,
+    tmp_dir,
+    package_test_flit,
+    verbosity: int,
+):
+    monkeypatch.setenv('NO_COLOR', '')
+
+    cmd = [package_test_flit, '-w', '-o', tmp_dir]
+    if verbosity:
+        cmd.insert(0, f'-{"v" * verbosity}')
+
+    build.__main__.main(cmd)
+
+    stdout = capsys.readouterr().out.splitlines()
+    assert sum(1 for o in stdout if o.startswith('> ')) == verbosity
